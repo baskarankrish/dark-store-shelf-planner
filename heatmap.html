@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Woolworths – Category correlation matrix</title>
+<style>
+/* Shared light layout. Brand tokens set on body.ww / body.nf */
+:root{
+  --page:#F4F4F0; --card:#FFFFFF; --line:#DDDDD8; --ink:#1A1A1A; --ink-2:#555555;
+  --focus:#0B57D0; --radius:8px;
+  font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+}
+body.ww{ --brand:#178841; --brand-dk:#0F6B32; --brand-text:#0F6B32; --hdr-bg:#FFFFFF; --hdr-ink:#1A1A1A; --hdr-line:#0F6B32; --wm:#178841; }
+body.nf{ --brand:#E50914; --brand-dk:#B20710; --brand-text:#B20710; --hdr-bg:#141414; --hdr-ink:#FFFFFF; --hdr-line:#B20710; --wm:#E50914; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);line-height:1.5;font-size:15px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+.hdr{background:var(--hdr-bg);border-bottom:4px solid var(--hdr-line)}
+.hdr .in{padding:10px 14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.wordmark{font-weight:900;font-size:30px;line-height:1;color:var(--wm);letter-spacing:-.01em}
+body.nf .wordmark{font-family:Impact,"Arial Narrow Bold","Bebas Neue",Haettenschweiler,sans-serif;font-weight:400;letter-spacing:.04em;font-size:32px}
+.hdr h1{margin:0;font-size:19px;font-weight:700;color:var(--hdr-ink);padding-left:18px;border-left:1px solid #9A9A9A;line-height:1.4}
+
+.hdr .home{margin-left:auto;font-size:15px;font-weight:600;color:var(--brand-text);text-decoration:none;padding:6px 12px;border:1.5px solid currentColor;border-radius:6px}
+.hdr .home:hover{background:#EEF4EF}
+main{max-width:1320px;margin:0 auto;padding:22px 16px 48px}
+.intro{max-width:620px;margin:0 0 16px;color:var(--ink-2);font-size:15px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+
+/* Heatmap */
+.hm-wrap{margin:0 auto;max-width:1120px}
+.hm-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.hm{border-collapse:separate;border-spacing:2px;margin:0 auto}
+table.hm thead th{height:150px;vertical-align:bottom;padding:0 0 8px;font-size:13px;font-weight:600;color:var(--ink)}
+table.hm thead th span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
+table.hm tbody th{text-align:right;padding:0 10px 0 0;font-size:13px;font-weight:600;white-space:nowrap}
+table.hm td{width:56px;min-width:44px;height:50px;text-align:center;font-size:13px;border-radius:3px}
+table.hm td:focus-visible{outline:3px solid var(--focus);outline-offset:1px;position:relative;z-index:1}
+.legend{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink-2);margin:12px 0 0;flex-wrap:wrap}
+.legend .bar{width:260px;max-width:50vw;height:12px;border-radius:6px}
+.readout{min-height:1.5em;font-size:14px;margin:8px 0 0;color:var(--ink)}
+
+@media (max-width:600px){
+  .hdr h1{border-left:0;padding-left:0;flex-basis:100%;font-size:17px}
+  .hdr .home{margin-left:0}
+  .wordmark{font-size:24px} body.nf .wordmark{font-size:26px}
+  table.hm td{width:36px;min-width:34px;height:36px;font-size:11px}
+  table.hm thead th,table.hm tbody th{font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+
+</style>
+</head>
+<body class="ww">
+<header class="hdr"><div class="in">
+  <span class="wordmark" role="img" aria-label="Woolworths">Woolworths</span>
+  <h1>Category correlation matrix</h1>
+  <a class="home" href="index.html">← Project home</a>
+</div></header>
+
+<main>
+  <div class="hm-wrap">
+    <p class="intro" id="intro"></p>
+    <div class="card">
+      <div class="hm-scroll" role="region" aria-label="Correlation heatmap, scrolls sideways on small screens" tabindex="0">
+        <table class="hm" id="hm"><caption class="sr-only">Pearson correlation of customer spend between product categories. Use arrow keys to move between cells.</caption></table>
+      </div>
+      <p class="readout" id="readout" aria-live="polite"></p>
+    </div>
+    <div class="legend" aria-hidden="true"><span>−1 move opposite</span><span class="bar" id="bar"></span><span>+1 move together</span></div>
+  </div>
+</main>
+
+<script>
+const DATA = {"codes":["A.Milk","B.Bread","C.Eggs","D.Pasta","E.Pasta Sauce","F.Nachos","G.Salsa","H.Diapers","I.Wet wipes","J.Chocolates"],"labels":["Milk","Bread","Eggs","Pasta","Pasta Sauce","Nachos","Salsa","Diapers","Wet wipes","Chocolates"],"spend":[[27.3,116.7,20.7,73.1,189.8,438.0,253.9,272.4,86.0,465.8,137.4,108.9,166.1,162.3,249.5,5.6,54.6,143.0,70.4,78.7,41.4,11.7,78.7,261.9,169.1,55.8,142.3,55.3,15.6,135.5,89.4,78.0,214.4,105.5,32.9,285.3,385.7,182.9,139.6,225.8,31.2,36.8,15.6,26.3,32.4,108.2,72.1,21.2,141.8,45.8,431.8,31.2,13.4,21.2,92.8,261.6,56.3,97.7,60.9,121.1,47.5,57.5,121.1,19.0,64.1,54.1,13.4,61.4,136.4,280.7,58.5,477.1,50.2,86.5,66.5,77.0,108.4,99.9,133.8,60.9,208.1,483.7,40.2,128.4,224.2,29.0,108.7,73.6,137.9,224.4,144.2,50.2,58.0,76.5,636.3,79.4,123.8,456.9,59.7,71.4],[17.2,219.2,30.5,30.5,140.0,191.8,146.3,676.8,69.6,233.9,68.0,104.9,65.0,68.0,282.3,9.4,21.9,115.7,171.4,101.7,43.8,14.1,74.3,329.6,151.1,71.9,82.2,38.3,18.0,123.7,148.7,40.6,210.4,230.9,40.7,115.8,401.5,191.6,176.9,118.9,18.0,85.3,23.5,47.0,72.8,82.1,96.3,34.4,82.1,79.7,545.1,52.3,82.2,12.5,90.0,369.4,83.8,53.2,65.8,57.1,60.2,94.7,75.1,31.3,75.1,60.2,75.9,32.1,64.9,282.6,82.9,461.6,37.5,36.7,86.9,117.4,372.4,101.7,75.2,22.7,212.7,1106.3,137.0,133.7,320.5,81.3,90.6,85.3,148.5,342.0,99.3,37.5,38.3,46.1,507.4,129.8,125.1,233.2,76.7,37.6],[16.2,90.6,20.4,57.0,221.2,574.4,148.2,120.6,85.8,176.4,121.0,92.8,92.8,136.0,176.4,0.0,32.0,90.2,47.0,42.0,87.4,10.8,35.8,274.2,627.4,62.4,194.2,52.0,10.0,133.6,149.6,78.6,199.6,114.0,21.2,155.4,171.8,211.8,224.8,396.6,25.0,25.8,15.0,16.2,5.4,77.4,42.8,15.0,140.6,36.2,817.2,20.4,10.0,10.0,122.0,165.6,36.6,72.8,78.2,126.0,32.0,20.0,40.4,10.8,62.4,32.0,15.0,37.8,89.0,111.6,30.4,345.6,98.2,82.8,78.2,66.6,148.6,107.4,146.8,58.2,114.8,452.6,63.2,114.0,208.4,30.8,88.6,83.6,60.8,156.0,70.4,42.8,30.0,26.6,485.0,64.4,144.0,488.4,63.6,77.8],[54.0,79.5,37.5,75.0,96.0,3.0,18.5,90.5,23.0,104.5,55.0,115.0,24.0,17.0,85.0,314.0,36.0,58.5,74.0,62.0,15.0,23.0,53.0,25.0,28.0,44.5,38.5,97.0,137.0,302.5,58.0,126.0,30.5,24.0,88.0,12.5,48.5,42.0,23.5,99.5,110.0,74.5,31.0,72.0,62.5,19.5,40.5,28.0,23.0,63.5,58.5,23.0,25.5,291.0,178.0,111.0,18.0,45.0,119.5,21.0,13.0,71.0,24.5,29.0,145.5,89.5,110.5,7.5,33.0,70.0,31.5,168.0,73.5,44.0,189.5,22.0,18.0,41.0,7.5,25.0,27.5,278.0,49.5,191.0,27.5,41.5,405.0,25.5,83.0,129.0,114.5,18.0,71.0,90.0,26.5,243.5,104.0,90.0,78.0,213.0],[37.8,65.7,37.3,51.1,85.9,4.0,11.1,62.0,19.7,38.5,39.9,101.5,14.8,9.0,58.6,307.0,21.5,35.7,60.6,44.5,16.5,18.0,29.1,18.0,49.9,40.2,35.7,99.4,117.2,223.7,70.8,87.7,25.4,24.9,79.3,4.5,26.5,42.1,23.7,131.1,80.2,70.2,25.9,44.7,26.0,14.8,26.0,23.1,15.4,55.2,91.5,21.7,30.2,192.8,143.3,93.5,13.5,33.4,104.3,17.0,9.0,34.1,14.8,15.7,154.9,74.5,155.4,4.0,23.4,34.0,22.5,141.8,78.8,29.1,211.2,18.0,24.7,33.4,3.7,24.1,17.2,206.7,59.1,153.2,22.0,43.5,462.0,24.6,49.4,97.3,74.6,11.1,60.7,57.4,15.1,201.7,81.0,74.8,71.7,168.3],[33.6,14.4,86.4,19.2,4.8,28.8,24.0,19.2,192.0,355.2,52.8,52.8,9.6,76.8,28.8,158.4,86.4,4.8,110.4,28.8,24.0,28.8,28.8,19.2,4.8,76.8,24.0,72.0,33.6,24.0,0.0,67.2,9.6,14.4,72.0,24.0,28.8,33.6,33.6,9.6,9.6,48.0,24.0,187.2,240.0,33.6,33.6,24.0,19.2,19.2,0.0,9.6,129.6,124.8,67.2,24.0,14.4,33.6,43.2,14.4,52.8,105.6,14.4,4.8,105.6,57.6,19.2,43.2,9.6,81.6,412.8,28.8,96.0,67.2,33.6,48.0,0.0,24.0,14.4,28.8,81.6,33.6,24.0,19.2,0.0,38.4,9.6,115.2,62.4,163.2,52.8,24.0,48.0,81.6,4.8,436.8,33.6,48.0,43.2,67.2],[18.0,16.0,33.5,52.0,26.0,62.0,20.5,8.5,106.5,116.5,87.0,28.0,17.0,145.0,22.5,26.5,45.5,0.0,49.0,21.5,29.0,25.5,17.5,20.5,52.0,65.5,93.0,86.5,54.0,40.0,4.5,125.5,8.5,20.5,30.0,28.0,16.0,24.5,38.5,29.0,13.5,17.5,21.5,40.0,20.0,22.0,16.0,8.5,20.5,8.5,4.0,4.0,20.0,114.0,103.5,18.0,12.0,40.5,65.0,18.0,13.5,33.5,8.5,0.0,80.0,28.0,4.0,12.0,20.5,78.0,95.5,24.0,201.5,128.5,52.0,30.5,0.0,38.0,29.5,66.0,26.0,20.5,13.5,13.0,0.0,8.5,12.5,47.0,47.5,58.0,32.0,33.5,20.5,34.0,21.5,150.5,63.5,167.5,16.0,187.0],[105.0,21.0,105.0,63.0,63.0,567.0,2688.0,546.0,630.0,336.0,84.0,63.0,21.0,147.0,420.0,105.0,294.0,126.0,63.0,147.0,315.0,336.0,21.0,462.0,504.0,462.0,273.0,63.0,42.0,252.0,84.0,189.0,1029.0,21.0,84.0,126.0,105.0,462.0,105.0,294.0,126.0,42.0,21.0,1029.0,1701.0,252.0,210.0,252.0,63.0,42.0,126.0,0.0,105.0,126.0,357.0,105.0,105.0,231.0,147.0,483.0,210.0,483.0,105.0,210.0,21.0,42.0,84.0,252.0,147.0,63.0,273.0,336.0,63.0,147.0,21.0,168.0,84.0,147.0,210.0,126.0,21.0,63.0,168.0,294.0,21.0,210.0,42.0,210.0,42.0,588.0,168.0,735.0,42.0,0.0,105.0,168.0,105.0,42.0,21.0,42.0],[309.0,32.5,136.0,44.5,63.0,223.0,617.5,234.5,291.5,255.5,66.0,76.5,87.0,215.5,370.5,158.0,135.0,241.0,54.0,68.5,296.5,77.0,28.5,305.0,113.5,88.5,149.5,145.5,76.5,174.5,87.0,116.0,384.0,76.5,118.0,537.5,70.0,704.0,51.5,357.5,374.0,54.0,15.0,804.5,1355.0,305.5,159.0,217.5,60.5,67.5,98.5,15.0,95.5,124.5,108.0,127.0,38.0,107.5,88.5,328.5,291.0,609.0,279.0,103.0,115.5,53.0,74.5,363.0,212.5,105.5,317.0,202.5,54.0,69.5,19.5,431.0,121.0,187.0,103.0,122.0,42.5,81.0,49.0,297.0,117.5,155.0,70.0,238.0,29.5,271.5,144.5,906.0,110.0,99.0,29.5,71.5,223.5,42.0,96.0,132.5],[59.7,81.3,99.5,41.2,48.1,37.4,293.2,721.2,53.5,24.0,14.4,22.0,20.6,50.4,239.1,52.9,16.5,64.2,91.2,111.1,79.2,64.8,16.8,220.6,96.4,52.8,70.3,37.8,120.4,99.5,93.3,31.6,173.6,157.8,52.8,113.3,48.0,192.1,24.0,60.8,141.7,57.0,20.6,425.7,1512.6,100.9,135.5,170.9,12.0,55.2,56.0,12.0,260.8,52.8,48.0,135.8,66.2,31.2,46.3,62.1,98.1,705.6,140.3,182.1,41.2,24.7,134.5,30.2,91.2,126.6,134.5,84.4,10.3,15.1,16.5,312.6,200.9,153.7,41.2,24.0,14.4,76.9,84.4,133.2,96.8,107.7,46.0,44.6,32.3,120.8,48.8,579.7,21.3,24.0,41.5,24.0,130.7,14.4,19.2,35.0]],"products":[[{"name":"A2 Full Cream Milk 2L","spend":5040.0,"units":900},{"name":"Pauls Full Cream Milk 2L","spend":4036.5,"units":1035},{"name":"Dairy Farmers Lite Milk 2L","spend":3958.5,"units":1015}],[{"name":"Abbott's Village Bakery Farmhouse Wholemeal 800g","spend":4855.1,"units":1033},{"name":"Helga's Wholemeal 750g","spend":4732.9,"units":1007},{"name":"Wonder White Sandwich 700g","spend":4067.7,"units":1043}],[{"name":"Woolworths Free Range Eggs 12 pack 700g","spend":6075.0,"units":1125},{"name":"Pace Farm Free Range Eggs 12 pack 600g","spend":5815.0,"units":1163}],[{"name":"Latina Fresh Beef Ravioli 625g","spend":3893.0,"units":458},{"name":"Barilla Spaghetti 500g","spend":2097.0,"units":699},{"name":"San Remo Penne 500g","spend":1682.5,"units":673}],[{"name":"Barilla Basilico Pasta Sauce 400g","spend":2331.0,"units":518},{"name":"Leggo's Bolognese Pasta Sauce 500g","spend":2148.0,"units":537},{"name":"Dolmio Pasta Sauce Classic Tomato 500g","spend":1972.1,"units":533}],[{"name":"Doritos Corn Chips Cheese Supreme 170g","spend":2899.2,"units":604},{"name":"CC's Corn Chips Tasty Cheese 175g","spend":2851.2,"units":594}],[{"name":"Old El Paso Thick N Chunky Salsa Mild 300g","spend":2205.0,"units":490},{"name":"Tostitos Salsa Medium 300g","spend":2008.0,"units":502}],[{"name":"Huggies Ultra Dry Nappy Pants Size 4 29 pack","spend":12033.0,"units":573},{"name":"BabyLove Cosifit Nappies Size 3 54 pack","spend":11592.0,"units":552}],[{"name":"Huggies Baby Wipes Fragrance Free 80 pack","spend":10150.0,"units":2030},{"name":"Curash Baby Wipes 80 pack","spend":9067.5,"units":2015}],[{"name":"Maltesers Box 400g","spend":5760.0,"units":480},{"name":"Cadbury Dairy Milk Chocolate Block 180g","spend":2964.5,"units":539},{"name":"Lindt Excellence 70% Cocoa Dark Chocolate 100g","spend":2889.6,"units":602}]],"meta":{"customers":100,"orders":1995,"lines":8902,"total":117124.3}};
+/* Shared: Pearson matrix + accessible heatmap table */
+function pearsonMatrix(cols){
+  const k=cols.length, n=cols[0].length;
+  const z=cols.map(col=>{ const m=col.reduce((a,b)=>a+b,0)/n; const d=col.map(v=>v-m);
+    const s=Math.sqrt(d.reduce((a,b)=>a+b*b,0)); return d.map(v=>v/s); });
+  const R=[]; for(let i=0;i<k;i++){ R.push([]); for(let j=0;j<k;j++){
+    let s=0; for(let t=0;t<n;t++) s+=z[i][t]*z[j][t]; R[i].push(i===j?1:s); } }
+  return R;
+}
+function fmtR(v){ const s=v.toFixed(2); return s==='-0.00'?'-0.00':s; }
+
+/* Diverging colour: NEG (−1) → white (0) → POS (+1) */
+function makeScale(NEG,POS){
+  const MID=[255,255,255];
+  const mix=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+  const colour=r=>{ const t=Math.max(-1,Math.min(1,r)); return t<0?mix(MID,NEG,-t):mix(MID,POS,t); };
+  const lum=c=>c.map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);}).reduce((s,v,i)=>s+v*[0.2126,0.7152,0.0722][i],0);
+  const text=c=>{ const l=lum(c); return (1.05/(l+0.05)) > ((l+0.05)/0.05) ? '#FFFFFF' : '#1A1A1A'; };
+  const rgb=c=>`rgb(${c.join(',')})`;
+  return {colour,text,rgb,gradient:`linear-gradient(90deg,${rgb(NEG)},#fff,${rgb(POS)})`};
+}
+
+function renderHeatmap(tbl, labels, R, scale, readout, describe){
+  const hr=tbl.createTHead().insertRow();
+  const c0=document.createElement('td'); c0.setAttribute('aria-hidden','true'); hr.appendChild(c0);
+  labels.forEach(l=>{ const th=document.createElement('th'); th.scope='col'; th.innerHTML=`<span>${l}</span>`; hr.appendChild(th); });
+  const tb=tbl.createTBody();
+  labels.forEach((li,i)=>{
+    const tr=tb.insertRow(); const th=document.createElement('th'); th.scope='row'; th.textContent=li; tr.appendChild(th);
+    labels.forEach((lj,j)=>{
+      const r=R[i][j], c=scale.colour(r), td=tr.insertCell();
+      td.style.background=scale.rgb(c); td.style.color=scale.text(c);
+      td.textContent=fmtR(r); td.dataset.i=i; td.dataset.j=j; td.tabIndex=(i===0&&j===0)?0:-1;
+      const msg=i===j?`${li}: diagonal, always 1.00`:`${li} and ${lj}: r = ${fmtR(r)}`;
+      td.title=msg; td.setAttribute('aria-label',msg);
+    });
+  });
+  const say=td=>{ const i=+td.dataset.i,j=+td.dataset.j; readout.textContent = i===j ? `${labels[i]} compared with itself is always 1.00.` : describe(labels[i],labels[j],R[i][j]); };
+  tbl.addEventListener('mouseover',e=>{ if(e.target.matches('td[data-i]')) say(e.target); });
+  tbl.addEventListener('focusin',e=>{ if(e.target.matches('td[data-i]')) say(e.target); });
+  tbl.addEventListener('keydown',e=>{
+    const td=e.target; if(!td.matches('td[data-i]')) return;
+    const k={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key]; if(!k) return;
+    e.preventDefault(); const n=labels.length;
+    const i=Math.max(0,Math.min(n-1,+td.dataset.i+k[0])), j=Math.max(0,Math.min(n-1,+td.dataset.j+k[1]));
+    const nx=tbl.querySelector(`td[data-i="${i}"][data-j="${j}"]`); td.tabIndex=-1; nx.tabIndex=0; nx.focus();
+  });
+}
+function strengthWord(r){ const a=Math.abs(r); return a>=0.7?'strong':a>=0.4?'moderate':a>=0.2?'weak':'little or no'; }
+
+/* Average-linkage clustering on r: merge while mean r between clusters >= threshold */
+function clusterAvg(R, threshold){
+  let cl=R.map((_,i)=>[i]);
+  const link=(a,b)=>{ let s=0; a.forEach(i=>b.forEach(j=>s+=R[i][j])); return s/(a.length*b.length); };
+  while(cl.length>1){
+    let best=-Infinity,bi=-1,bj=-1;
+    for(let i=0;i<cl.length;i++) for(let j=i+1;j<cl.length;j++){ const v=link(cl[i],cl[j]); if(v>best){best=v;bi=i;bj=j;} }
+    if(best<threshold) break;
+    cl[bi]=cl[bi].concat(cl[bj]); cl.splice(bj,1);
+  }
+  return cl;
+}
+
+const R = pearsonMatrix(DATA.spend);
+document.getElementById('intro').textContent =
+  `Each customer's spend (quantity × unit price) is totalled per category. Each cell is the Pearson correlation between two categories' spend across ${DATA.meta.customers} customers: +1 means customers who spend more on one also spend more on the other, 0 means no link, −1 means the opposite.`;
+const scale = makeScale([200,80,30],[15,107,50]);   // orange-red  ← white →  Woolworths green
+document.getElementById('bar').style.background = scale.gradient;
+renderHeatmap(document.getElementById('hm'), DATA.labels, R, scale, document.getElementById('readout'),
+  (a,b,r)=>`${a} × ${b}: r = ${fmtR(r)}, ${strengthWord(r)} ${r<=-0.2?'negative ':''}relationship.`);
+</script>
+</body>
+</html>
